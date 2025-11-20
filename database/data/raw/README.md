@@ -1,3 +1,4 @@
+at the current directory
 
 for manual update, use `manual_update.py`
 
