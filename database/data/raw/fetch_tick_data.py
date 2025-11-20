@@ -6,6 +6,7 @@ from typing import List, Optional
 import threading
 import time
 import random
+import logging
 
 # --- Configuration ---
 NODE_MEMORY_LIMIT = int(os.environ.get('NODE_MEMORY_LIMIT', '8192'))  # In MB
@@ -21,6 +22,15 @@ FETCH_REQUEST_DELAY = float(os.environ.get('FETCH_REQUEST_DELAY', '0.2'))
 
 # Semaphore to limit concurrent Node.js fetch processes
 FETCH_SEMAPHORE = threading.BoundedSemaphore(MAX_CONCURRENT_FETCHES)
+
+# logging
+LOG_PATH = os.path.join(os.path.dirname(__file__), 'fetch_tick_data.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[logging.FileHandler(LOG_PATH, encoding='utf-8'), logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 
 def _build_command(asset: str, date: datetime) -> List[str]:
@@ -56,10 +66,10 @@ def fetch_tick_data_for_day(asset: str, date: datetime) -> List[dict]:
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=PROCESS_TIMEOUT, check=False)
             except FileNotFoundError:
-                print(f"❌ Node or fetcher script not found: {cmd[0]} or {FETCHER_SCRIPT_PATH}")
+                logger.error("Node or fetcher script not found: %s or %s", cmd[0], FETCHER_SCRIPT_PATH)
                 return []
             except subprocess.TimeoutExpired:
-                print(f"⏱️ Timeout (attempt {attempt}) fetching data for {asset} on {date.strftime('%Y-%m-%d')}")
+                logger.warning("Timeout (attempt %d) fetching data for %s on %s", attempt, asset, date.strftime('%Y-%m-%d'))
                 result = None
 
             if result is None:
@@ -67,7 +77,7 @@ def fetch_tick_data_for_day(asset: str, date: datetime) -> List[dict]:
                 pass
             elif result.returncode != 0:
                 stderr = result.stderr.strip() if result.stderr else '<no stderr>'
-                print(f"❌ Node.js error (attempt {attempt}) for {asset} on {date.strftime('%Y-%m-%d')}: {stderr}")
+                logger.warning("Node.js error (attempt %d) for %s on %s: %s", attempt, asset, date.strftime('%Y-%m-%d'), stderr)
             else:
                 try:
                     payload = json.loads(result.stdout or '[]')
@@ -76,7 +86,7 @@ def fetch_tick_data_for_day(asset: str, date: datetime) -> List[dict]:
                     return payload
                 except json.JSONDecodeError as e:
                     raw = (result.stdout or '')[:400]
-                    print(f"❌ JSON decode error for {asset} on {date.strftime('%Y-%m-%d')}: {e}\nRaw output: '{raw}'")
+                    logger.error("JSON decode error for %s on %s: %s -- Raw: %s", asset, date.strftime('%Y-%m-%d'), e, raw)
 
         finally:
             if acquired:
@@ -90,10 +100,10 @@ def fetch_tick_data_for_day(asset: str, date: datetime) -> List[dict]:
             backoff = min(FETCH_BACKOFF_MAX, FETCH_BACKOFF_BASE * (2 ** (attempt - 1)))
             # add jitter
             sleep_time = backoff * (0.5 + random.random() / 2.0)
-            print(f"⏳ Backing off for {sleep_time:.2f}s before retry {attempt + 1} for {asset} {date.strftime('%Y-%m-%d')}")
+            logger.info("Backing off for %.2fs before retry %d for %s %s", sleep_time, attempt + 1, asset, date.strftime('%Y-%m-%d'))
             time.sleep(sleep_time)
 
-    print(f"❌ Failed to fetch data for {asset} on {date.strftime('%Y-%m-%d')} after {FETCH_MAX_RETRIES} attempts")
+    logger.error("Failed to fetch data for %s on %s after %d attempts", asset, date.strftime('%Y-%m-%d'), FETCH_MAX_RETRIES)
     return []
 
 
@@ -130,13 +140,13 @@ def fetch_and_store_tick_data(start_date: datetime, end_date: datetime, asset: s
                 try:
                     store_func(df, asset, save_dir)
                     saved_days += 1
-                    print(f"✅ Stored {asset} {current.strftime('%Y-%m-%d')}")
+                    logger.info("Stored %s %s", asset, current.strftime('%Y-%m-%d'))
                 except Exception as e:
-                    print(f"❌ Error storing {asset} {current.strftime('%Y-%m-%d')}: {e}")
+                    logger.exception("Error storing %s %s: %s", asset, current.strftime('%Y-%m-%d'), e)
             else:
-                print(f"⚠️ Fetched data invalid or no `timestamp` for {asset} {current.strftime('%Y-%m-%d')}")
+                logger.warning("Fetched data invalid or no `timestamp` for %s %s", asset, current.strftime('%Y-%m-%d'))
         else:
-            print(f"⚠️ No data for {asset} {current.strftime('%Y-%m-%d')}")
+            logger.warning("No data for %s %s", asset, current.strftime('%Y-%m-%d'))
 
         current = current + timedelta(days=1)
 
@@ -152,9 +162,21 @@ if __name__ == '__main__':
     parser.add_argument('--end', required=True, help='End date YYYY-MM-DD (exclusive)')
     parser.add_argument('--asset', required=True, help='Asset symbol (e.g., eurusd)')
     parser.add_argument('--save-dir', required=False, help='Directory to save HDF5 files')
+    parser.add_argument('--log-file', required=False, help='Optional log file path (overrides default)')
     args = parser.parse_args()
+
+    # allow overriding log file path
+    if args.log_file:
+        for h in list(logger.handlers):
+            logger.removeHandler(h)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s %(levelname)s: %(message)s',
+            handlers=[logging.FileHandler(args.log_file, encoding='utf-8'), logging.StreamHandler()]
+        )
+        logger = logging.getLogger(__name__)
 
     s = datetime.strptime(args.start, '%Y-%m-%d')
     e = datetime.strptime(args.end, '%Y-%m-%d')
     count = fetch_and_store_tick_data(s, e, args.asset, save_dir=args.save_dir)
-    print(f"Finished. Days saved: {count}")
+    logger.info("Finished. Days saved: %d", count)

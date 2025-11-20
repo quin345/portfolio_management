@@ -5,40 +5,54 @@ from datetime import datetime, timedelta
 import pandas as pd
 import time
 import random
+import logging
+import os
 
 from fetch_tick_data import fetch_tick_data_for_day
 from store_tick_data import store_tick_data
 
 
-def run_fetch(symbol: str, last_date_str: str, end_date: datetime, save_dir: str):
+LOG_PATH = os.path.join(os.path.dirname(__file__), 'batch_update.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[logging.FileHandler(LOG_PATH, encoding='utf-8'), logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
+
+
+def run_fetch(symbol: str, last_date_str: str, end_date: datetime, save_dir: str, delay_between_days: float = 0.05):
     try:
         start_date = datetime.strptime(last_date_str, "%Y-%m-%d") + timedelta(days=1)
         if start_date >= end_date:
-            print(f"⏩ Skipping {symbol}: start date {start_date.date()} is beyond end date.")
+            logger.info("Skipping %s: start date %s is beyond end date.", symbol, start_date.date())
             return
 
-        print(f"🚀 Fetching {symbol} from {start_date.date()} to {end_date.date()}")
+        logger.info("Fetching %s from %s to %s", symbol, start_date.date(), end_date.date())
 
         while start_date < end_date:
-            print(f"📅 Fetching data for {symbol} {start_date.strftime('%Y-%m-%d')}...")
+            logger.info("Fetching data for %s %s", symbol, start_date.strftime('%Y-%m-%d'))
             tick_data = fetch_tick_data_for_day(symbol, start_date)
 
             if tick_data:
                 df = pd.DataFrame(tick_data)
-                store_tick_data(df, symbol, save_dir)
-                print(f"✅ Saved data for {symbol} {start_date.strftime('%Y-%m-%d')}.")
+                try:
+                    store_tick_data(df, symbol, save_dir)
+                    logger.info("Saved data for %s %s", symbol, start_date.strftime('%Y-%m-%d'))
+                except Exception as e:
+                    logger.exception("Error saving data for %s %s: %s", symbol, start_date.strftime('%Y-%m-%d'), e)
             else:
-                print(f"⚠️ No valid data for {symbol} {start_date.strftime('%Y-%m-%d')}.")
+                logger.warning("No valid data for %s %s", symbol, start_date.strftime('%Y-%m-%d'))
 
             # small randomized pause to avoid hitting server in bursts
-            time.sleep(random.uniform(0.05, 0.25))
+            time.sleep(delay_between_days + random.uniform(0, 0.05))
 
             start_date += timedelta(days=1)
 
-        print(f"🏁 Finished fetching {symbol} tick data.")
+        logger.info("Finished fetching %s tick data.", symbol)
 
     except Exception as e:
-        print(f"❌ Error fetching {symbol} from {last_date_str}: {e}")
+        logger.exception("Error fetching %s from %s: %s", symbol, last_date_str, e)
 
 
 def main():
@@ -46,12 +60,27 @@ def main():
     parser.add_argument("--end-date", required=True, help="Target end date in YYYY-MM-DD format")
     parser.add_argument("--csv", default="last_tick_update.csv", help="CSV file with last update dates")
     parser.add_argument("--save-dir", default="2015_tick_data", help="Directory to save HDF5 files")
+    parser.add_argument("--workers", type=int, help="Override BATCH_MAX_WORKERS env var")
+    parser.add_argument("--log-file", required=False, help="Optional log file path (overrides default)")
     args = parser.parse_args()
+
+    # allow overriding log file path
+    if args.log_file:
+        for h in list(logger.handlers):
+            logger.removeHandler(h)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s %(levelname)s: %(message)s',
+            handlers=[logging.FileHandler(args.log_file, encoding='utf-8'), logging.StreamHandler()]
+        )
+        # re-fetch module logger so it uses the new handlers/root configuration
+        logger = logging.getLogger(__name__)
 
     try:
         end_date = datetime.strptime(args.end_date, "%Y-%m-%d")
     except ValueError:
-        raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
+        logger.error("Invalid date format. Please use YYYY-MM-DD.")
+        return
 
     csv_file = args.csv
     save_dir = args.save_dir
@@ -68,11 +97,22 @@ def main():
             if symbol and last_date:
                 symbols_dates.append((symbol, last_date))
 
-    max_workers = int(os.environ.get('BATCH_MAX_WORKERS', '8'))
-    max_workers = min(max_workers, max(1, len(symbols_dates)))
+    env_workers = int(os.environ.get('BATCH_MAX_WORKERS', '8'))
+    if args.workers:
+        max_workers = max(1, args.workers)
+    else:
+        max_workers = min(env_workers, max(1, len(symbols_dates)))
+
+    logger.info("Starting batch update with workers=%d", max_workers)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
         for symbol, last_date in symbols_dates:
-            executor.submit(run_fetch, symbol, last_date, end_date, save_dir)
+            futures.append(executor.submit(run_fetch, symbol, last_date, end_date, save_dir))
+        for fut in futures:
+            try:
+                fut.result()
+            except Exception as e:
+                logger.exception("Batch task failed: %s", e)
 
 
 if __name__ == '__main__':
