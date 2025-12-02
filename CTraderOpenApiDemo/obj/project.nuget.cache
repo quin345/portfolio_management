@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "dgSpecHash": "PF1NJGbRZkQ=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\jessi\\Projects\\portfolio_management\\CTraderOpenApiDemo\\CTraderOpenApiDemo.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\jessi\\.nuget\\packages\\ctrader.openapi.net\\1.4.4\\ctrader.openapi.net.1.4.4.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\google.protobuf\\3.20.1\\google.protobuf.3.20.1.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\spotware.openapi.net\\1.3.9\\spotware.openapi.net.1.3.9.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\system.reactive\\5.0.0\\system.reactive.5.0.0.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\system.text.encodings.web\\6.0.0\\system.text.encodings.web.6.0.0.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\system.text.json\\6.0.2\\system.text.json.6.0.2.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\system.threading.channels\\4.7.0\\system.threading.channels.4.7.0.nupkg.sha512",
+    "C:\\Users\\jessi\\.nuget\\packages\\websocket.client\\4.4.43\\websocket.client.4.4.43.nupkg.sha512"
+  ],
+  "logs": []
+}
