@@ -128,8 +128,16 @@ for manual update, use `manual_update.py`
 `python manual_update.py --start 2015-01-01 --end 2016-01-01 --asset usdjpy`
 
 scanner
-no date default to all data to date from 2015
-`python scanner.py --start-date 2015-01-01 --end-date 2025-11-08`
+`python scanner.py`
+`python scanner.py --instrument eurusd`
+`python scanner.py --instrument eurusd,gbpusd,usdjpy`
+`python scanner.py --start-date 2025-11-20 --end-date 2025-11-27 --instrument eurusd`
 
 batch update updates all instruments at once 
 `batch_update.py`
+
+
+
+instruments under acg eval
+
+python scanner.py --start-date 2015-01-01 --end-date 2025-02-01 --instrument audusd,eurusd,gbpusd,nzdusd,usdcad,usdchf,usdjpy,xagusd,xauusd,brentcmdusd,lightcmdusd,eusidxeur,deuidxeur,hkgidxhkd,jpnidxjpy,usatechidxusd,usa30idxusd,usa500idxusd      

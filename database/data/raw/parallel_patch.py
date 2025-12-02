@@ -181,7 +181,7 @@ def main():
     instrument_dates = parse_missing_groups(args.csv)
     all_tasks = [(instr, date) for instr, dates in instrument_dates.items() for date in dates]
 
-    env_workers = int(os.environ.get('PARALLEL_MAX_WORKERS', '6'))
+    env_workers = int(os.environ.get('PARALLEL_MAX_WORKERS', '32'))
     if args.workers:
         desired_workers = max(1, args.workers)
     else:

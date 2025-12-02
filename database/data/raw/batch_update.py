@@ -56,6 +56,7 @@ def run_fetch(symbol: str, last_date_str: str, end_date: datetime, save_dir: str
 
 
 def main():
+    global logger
     parser = argparse.ArgumentParser(description="Fetch tick data for symbols.")
     parser.add_argument("--end-date", required=True, help="Target end date in YYYY-MM-DD format")
     parser.add_argument("--csv", default="last_tick_update.csv", help="CSV file with last update dates")

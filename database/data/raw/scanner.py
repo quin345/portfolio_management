@@ -12,10 +12,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Scan HDF5 tick data for integrity.")
     parser.add_argument("--start-date", type=str, help="Start date in YYYY-MM-DD format")
     parser.add_argument("--end-date", type=str, help="End date in YYYY-MM-DD format")
+    parser.add_argument("--instrument", type=str, help="Instrument name or comma-separated list to scan (optional)")
     args = parser.parse_args()
     start = datetime.strptime(args.start_date, "%Y-%m-%d") if args.start_date else None
     end = datetime.strptime(args.end_date, "%Y-%m-%d") if args.end_date else None
-    return start, end
+    instruments = None
+    if args.instrument:
+        instruments = [s.strip() for s in args.instrument.split(",") if s.strip()]
+        if not instruments:
+            instruments = None
+    return start, end, instruments
 
 # === Date Utilities ===
 def valid_dates(year, month):
@@ -33,11 +39,18 @@ def is_dataset_good(dset):
         return False
 
 # === HDF5 File Scanner ===
-def scan_hdf5(file_path, start_date=None, end_date=None):
+def scan_hdf5(file_path, start_date=None, end_date=None, instruments=None):
     last_updates, missing_groups, missing_tables = [], [], []
 
     with h5py.File(file_path, "r") as f:
-        for instrument in f.keys():
+        available = list(f.keys())
+        if instruments:
+            # only scan requested instruments that exist in file
+            to_scan = [inst for inst in instruments if inst in available]
+        else:
+            to_scan = available
+
+        for instrument in to_scan:
             last_good_date = None
             for year_key in sorted(f[instrument].keys(), key=lambda x: int(x[1:])):
                 year_group = f[instrument][year_key]
@@ -99,11 +112,11 @@ def group_missing_days(missing_groups):
 
 # === Worker Wrapper ===
 def process_file(args):
-    filename, folder_path, start_date, end_date = args
+    filename, folder_path, start_date, end_date, instruments = args
     file_path = os.path.join(folder_path, filename)
     try:
         print(f"🔍 Scanning {filename}...")
-        last_rows, group_rows, table_rows = scan_hdf5(file_path, start_date, end_date)
+        last_rows, group_rows, table_rows = scan_hdf5(file_path, start_date, end_date, instruments)
         print(f"✅ {filename}: {len(last_rows)} updates, {len(group_rows)} missing groups, {len(table_rows)} missing tables")
         return last_rows, group_rows, table_rows
     except Exception as e:
@@ -112,7 +125,7 @@ def process_file(args):
 
 # === Main Execution ===
 def main():
-    start_date, end_date = parse_args()
+    start_date, end_date, instruments = parse_args()
     folder_path = "2015_tick_data"
 
     output_files = {
@@ -123,13 +136,17 @@ def main():
     }
 
     h5_files = [f for f in os.listdir(folder_path) if f.lower().endswith(".h5")]
-    print(f"📁 Found {len(h5_files)} HDF5 files in {folder_path}")
+    if instruments:
+        print(f"📁 Found {len(h5_files)} HDF5 files in {folder_path} — scanning instruments: {', '.join(instruments)}")
+    else:
+        print(f"📁 Found {len(h5_files)} HDF5 files in {folder_path}")
 
     all_last_updates, all_missing_groups, all_missing_tables = [], [], []
 
     with ProcessPoolExecutor(max_workers=28) as executor:
-        tasks = [(f, folder_path, start_date, end_date) for f in h5_files]
-        for future in as_completed([executor.submit(process_file, task) for task in tasks]):
+        tasks = [(f, folder_path, start_date, end_date, instruments) for f in h5_files]
+        futures = [executor.submit(process_file, task) for task in tasks]
+        for future in as_completed(futures):
             last_rows, group_rows, table_rows = future.result()
             all_last_updates.extend(last_rows)
             all_missing_groups.extend(group_rows)
