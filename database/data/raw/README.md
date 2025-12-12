@@ -140,4 +140,4 @@ batch update updates all instruments at once
 
 instruments under acg eval
 
-python scanner.py --start-date 2015-01-01 --end-date 2025-02-01 --instrument audusd,eurusd,gbpusd,nzdusd,usdcad,usdchf,usdjpy,xagusd,xauusd,brentcmdusd,lightcmdusd,eusidxeur,deuidxeur,hkgidxhkd,jpnidxjpy,usatechidxusd,usa30idxusd,usa500idxusd      
+python scanner.py --start-date 2015-01-01 --end-date 2025-02-01 --instrument audusd,eurusd,gbpusd,nzdusd,usdcad,usdchf,usdjpy,xagusd,xauusd,brentcmdusd,lightcmdusd,eusidxeur,gbridxgbp,deuidxeur,hkgidxhkd,jpnidxjpy,usatechidxusd,usa30idxusd,usa500idxusd      
