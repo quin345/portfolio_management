@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CTraderOpenApiDemo")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6caee708dd1c296fef98a9bdccdca4f7dd471dbc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bfafe1ee80b3eb0db26319b4f0b686ca9f872dfe")]
 [assembly: System.Reflection.AssemblyProductAttribute("CTraderOpenApiDemo")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CTraderOpenApiDemo")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

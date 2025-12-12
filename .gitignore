@@ -24,3 +24,19 @@ market_data.db
 
 MyFixClient/
 *.h5
+
+# Ignore log files
+*.log
+
+# Ignore temporary files
+*.tmp   
+
+# Ignore compiled Python files
+*.pyc
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+# Ignore virtual environment directories
+portfolio_management\CTraderOpenApiDemo\obj
+
+CTraderOpenApiDemo\bin\
