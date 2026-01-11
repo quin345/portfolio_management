@@ -40,3 +40,6 @@ MyFixClient/
 portfolio_management\CTraderOpenApiDemo\obj
 
 CTraderOpenApiDemo\bin\
+
+.env
+
