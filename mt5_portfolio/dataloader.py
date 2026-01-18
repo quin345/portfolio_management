@@ -176,3 +176,44 @@ def save_metadata(symbols, broker_name):
     conn.close()
 
     print(f"Saved metadata to table '{table}'")
+
+
+#load metadata
+def load_metadata(broker_name):
+    table = f"{broker_name.lower()}_metadata"
+
+    if not os.path.exists(DB_NAME):
+        raise FileNotFoundError(f"{DB_NAME} not found")
+
+    conn = sqlite3.connect(DB_NAME)
+    try:
+        df = pd.read_sql(f"SELECT * FROM {table}", conn)
+        df.columns = df.columns.str.strip().str.lower()
+        return df
+    finally:
+        conn.close()
+
+#load contract size info
+def load_contract_dataframe(broker_name, scaled_df):
+    """
+    Returns a DataFrame containing:
+    asset, contract_size, min_volume, digits, description, scaled_weight
+    """
+    table = f"{broker_name.lower()}_metadata"
+
+    conn = sqlite3.connect(DB_NAME)
+    try:
+        meta = pd.read_sql(f"SELECT * FROM {table}", conn)
+    finally:
+        conn.close()
+
+    # Normalize
+    meta.columns = meta.columns.str.strip().str.lower()
+
+    # Rename symbol → asset for consistency
+    meta.rename(columns={"symbol": "asset"}, inplace=True)
+
+    # Merge with scaled weights
+    df = meta.merge(scaled_df, on="asset", how="left")
+
+    return df

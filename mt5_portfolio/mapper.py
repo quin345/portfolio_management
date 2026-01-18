@@ -60,10 +60,19 @@ def load_symbols(source="mt5", csv_path=None):
 def build_fx_map(source="mt5", csv_path=None):
     symbols = load_symbols(source=source, csv_path=csv_path)
 
-    fx_map = {
-        symbol: fx
-        for symbol in symbols
-        if (fx := infer_fx_pair(symbol)) is not None
-    }
+    fx_map = {}
+    fx_exempt = set()
 
-    return fx_map
+    for symbol in symbols:
+        # Collect USDXXX exemptions
+        if symbol.startswith("USD"):
+            fx_exempt.add(symbol)
+            continue
+
+        fx = infer_fx_pair(symbol)
+        if fx is None:
+            continue
+
+        fx_map[symbol] = fx
+
+    return fx_map, fx_exempt
