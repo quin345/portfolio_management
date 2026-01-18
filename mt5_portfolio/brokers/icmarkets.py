@@ -5,6 +5,7 @@ from .base import BrokerBase
 
 class ICMarkets(BrokerBase):
     def __init__(self):
+        self.name = "icmarkets"
         load_dotenv()
         self.login = int(os.getenv("ICM_MT5_LOGIN"))
         self.password = os.getenv("ICM_MT5_PASSWORD")

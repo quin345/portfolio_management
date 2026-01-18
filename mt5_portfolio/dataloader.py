@@ -4,24 +4,26 @@ import numpy as np
 import sqlite3
 import os
 
+DB_NAME = "returns.db"
+
 # -----------------------------------------
 # Load symbols from CSV
+# -----------------------------------------
 def load_symbols_from_csv(csv_path):
     df = pd.read_csv(csv_path)
-    # Use the first column as symbols
-    symbols = df.iloc[:, 0].dropna().astype(str).tolist()
-    return symbols
+    return df.iloc[:, 0].dropna().astype(str).tolist()
+
 
 # -----------------------------------------
 # Fetch MT5 price data
 # -----------------------------------------
 def fetch_mt5_data(symbol, start_date=None):
+    utc_to = pd.Timestamp.now()
+
     if start_date is None:
-        utc_to = pd.Timestamp.now()
         utc_from = utc_to - pd.Timedelta(days=2000)
     else:
         utc_from = start_date
-        utc_to = pd.Timestamp.now()
 
     rates = mt5.copy_rates_range(symbol, mt5.TIMEFRAME_D1, utc_from, utc_to)
     if rates is None:
@@ -29,7 +31,7 @@ def fetch_mt5_data(symbol, start_date=None):
 
     df = pd.DataFrame(rates)
     df["time"] = pd.to_datetime(df["time"], unit="s")
-    df.set_index("time", inplace=True)
+    df.set_index("time", inplace=True)   # <— time is index here
     return df
 
 
@@ -41,19 +43,19 @@ def calculate_log_returns(series):
 
 
 # -----------------------------------------
-# Load existing returns for a broker
+# Load existing returns from DB
 # -----------------------------------------
-def load_existing_returns(broker_name):
-    db_name = "returns.db"
+def load_from_db(broker_name):
     table = f"{broker_name.lower()}_returns"
 
-    if not os.path.exists(db_name):
+    if not os.path.exists(DB_NAME):
         return None
 
-    conn = sqlite3.connect(db_name)
+    conn = sqlite3.connect(DB_NAME)
     try:
-        df = pd.read_sql(f"SELECT * FROM {table}", conn, parse_dates=["index"])
-        df.set_index("index", inplace=True)
+        df = pd.read_sql(f"SELECT * FROM {table}", conn)
+        df["time"] = pd.to_datetime(df["time"])
+        df.set_index("time", inplace=True)   # <— time becomes index
         return df
     except Exception:
         return None
@@ -62,23 +64,24 @@ def load_existing_returns(broker_name):
 
 
 # -----------------------------------------
-# Save returns to broker-specific table
+# Save returns to DB
 # -----------------------------------------
-def save_returns_to_db(returns_df, broker_name):
-    db_name = "returns.db"
+def save_to_db(df, broker_name):
     table = f"{broker_name.lower()}_returns"
+    conn = sqlite3.connect(DB_NAME)
 
-    conn = sqlite3.connect(db_name)
-    returns_df.to_sql(table, conn, if_exists="replace")
+    df_to_save = df.copy()
+    df_to_save.index.name = "time"     # <— enforce name
+    df_to_save.reset_index(inplace=True)
+
+    df_to_save.to_sql(table, conn, if_exists="replace", index=False)
     conn.close()
-
-    print(f"Saved returns to table '{table}' in returns.db")
 
 
 # -----------------------------------------
 # Compute USD-adjusted returns
 # -----------------------------------------
-def compute_usd_adjusted_returns(symbols, fx_map, start_date=None):
+def compute_returns(symbols, fx_map, start_date=None):
     data = {s: fetch_mt5_data(s, start_date) for s in symbols}
 
     fx_symbols = set(fx_map[s] for s in symbols if s in fx_map)
@@ -101,41 +104,75 @@ def compute_usd_adjusted_returns(symbols, fx_map, start_date=None):
 
             combined = pd.concat([idx_lr, fx_lr], axis=1, join="inner")
             combined.columns = ["idx", "fx"]
-
             asset_returns[symbol] = combined["idx"] + combined["fx"]
         else:
             asset_returns[symbol] = idx_lr
 
-    returns = pd.DataFrame(asset_returns)[symbols].dropna(how="any")
-    return returns
+    df = pd.DataFrame(asset_returns).dropna(how="any")
+    df.index.name = "time"   # <— enforce index name
+    return df
 
 
 # -----------------------------------------
-# Main loader with incremental update
+# Main loader with lookback + incremental update
 # -----------------------------------------
-def load_returns(symbols, fx_map, broker_name):
-    existing = load_existing_returns(broker_name)
+def load_log_returns(symbols, fx_map, broker_name, lookback_days=252):
+    existing = load_from_db(broker_name)
 
     if existing is None:
-        print("No existing data. Building full dataset...")
-        returns = compute_usd_adjusted_returns(symbols, fx_map)
-        save_returns_to_db(returns, broker_name)
-        return returns
+        print("No DB found. Fetching full data from MT5...")
+        df = compute_returns(symbols, fx_map)
+        save_to_db(df, broker_name)
+        return df.tail(lookback_days)
 
     last_date = existing.index.max()
-    print(f"Existing data found. Last date: {last_date.date()}")
+    today = pd.Timestamp.now().normalize()
 
+    if last_date >= today - pd.Timedelta(days=1):
+        print("DB is up to date. Using cached data.")
+        return existing.tail(lookback_days)
+
+    print(f"Updating DB from {last_date.date()} to today...")
     start_date = last_date + pd.Timedelta(days=1)
-    print(f"Fetching new data from {start_date.date()} onward...")
 
-    new_returns = compute_usd_adjusted_returns(symbols, fx_map, start_date=start_date)
+    new_data = compute_returns(symbols, fx_map, start_date=start_date)
 
-    if new_returns.empty:
-        print("No new data. Already up to date.")
-        return existing
+    if new_data.empty:
+        print("No new MT5 data available.")
+        return existing.tail(lookback_days)
 
-    updated = pd.concat([existing, new_returns])
+    updated = pd.concat([existing, new_data])
     updated = updated[~updated.index.duplicated(keep="last")]
 
-    save_returns_to_db(updated, broker_name)
-    return updated
+    save_to_db(updated, broker_name)
+    return updated.tail(lookback_days)
+
+
+# -----------------------------------------
+# Save metadata
+# -----------------------------------------
+def save_metadata(symbols, broker_name):
+    table = f"{broker_name.lower()}_metadata"
+
+    rows = []
+    for symbol in symbols:
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            continue
+
+        rows.append({
+            "symbol": symbol,
+            "contract_size": info.trade_contract_size,
+            "min_volume": info.volume_min,
+            "digits": info.digits,
+            "description": info.description,
+            "updated_at": pd.Timestamp.now()
+        })
+
+    df = pd.DataFrame(rows)
+
+    conn = sqlite3.connect(DB_NAME)
+    df.to_sql(table, conn, if_exists="replace", index=False)
+    conn.close()
+
+    print(f"Saved metadata to table '{table}'")
