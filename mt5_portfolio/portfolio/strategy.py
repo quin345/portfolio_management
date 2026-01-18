@@ -23,8 +23,7 @@ from lotsizing import run_lot_sizing
 # ============================================================
 def run_strategy(
     broker_name: str,
-    active_symbols_csv: str,
-    factor_signal_csv: str,
+    macro_signal_csv: str,
     vol_target: float,
     method: str,
     ewma_lambda: float,
@@ -70,14 +69,14 @@ def run_strategy(
     # --------------------------------------------------------
     # 2. Load symbols
     # --------------------------------------------------------
-    symbols = load_symbols_from_csv(active_symbols_csv)
+    symbols = load_symbols_from_csv(macro_signal_csv)
 
     # --------------------------------------------------------
     # 3. FX mapping
     # --------------------------------------------------------
     fx_map, fx_exempt = build_fx_map(
         source="csv",
-        csv_path=active_symbols_csv
+        csv_path=macro_signal_csv
     )
 
     # --------------------------------------------------------
@@ -104,7 +103,7 @@ def run_strategy(
     # 7. Expected returns
     # --------------------------------------------------------
     expected_returns = compute_expected_returns(
-        signals=factor_signal_csv,
+        signals=macro_signal_csv,
         returns=returns,
         ic=ic,
         vol_target=vol_target,

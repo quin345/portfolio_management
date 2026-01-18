@@ -2,15 +2,15 @@ import os
 from dotenv import load_dotenv
 from .base import BrokerBase
 
-class ICMarkets(BrokerBase):
+class ACG(BrokerBase):
     def __init__(self):
-        self.name = "icmarkets"
+        self.name = "acg"
         load_dotenv()
 
         # Store credentials
-        self.account = int(os.getenv("ICM_MT5_LOGIN"))
-        self.password = os.getenv("ICM_MT5_PASSWORD")
-        self.server = os.getenv("ICM_MT5_SERVER")
+        self.account = int(os.getenv("ACG_MT5_LOGIN"))
+        self.password = os.getenv("ACG_MT5_PASSWORD")
+        self.server = os.getenv("ACG_MT5_SERVER")
 
     def initialize(self):
         # Call BrokerBase.initialize() with credentials

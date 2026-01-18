@@ -10,7 +10,7 @@ DB_NAME = "returns.db"
 # Load symbols from CSV
 # -----------------------------------------
 def load_symbols_from_csv(csv_path):
-    df = pd.read_csv(csv_path)
+    df = pd.read_csv(csv_path, sep="\t")
     return df.iloc[:, 0].dropna().astype(str).tolist()
 
 
@@ -217,3 +217,66 @@ def load_contract_dataframe(broker_name, scaled_df):
     df = meta.merge(scaled_df, on="asset", how="left")
 
     return df
+
+# export active symbols
+from brokers import get_broker
+
+def export_active_symbols(broker_name=None, csv_path="active_symbols.csv"):
+    """Fetch active MT5 Market Watch symbols and export to CSV."""
+    import MetaTrader5 as mt5
+    import pandas as pd
+
+    # Initialize broker if provided
+    broker = None
+    if broker_name:
+        broker = get_broker(broker_name)
+        print(f"Using broker: {broker_name}")
+
+        # If your broker object has login() or initialize() methods, call them
+        if hasattr(broker, "initialize"):
+            broker.initialize()
+        if hasattr(broker, "login"):
+            broker.login()
+
+    else:
+        # Default MT5 init if no broker object is used
+        if not mt5.initialize():
+            raise RuntimeError("Failed to initialize MT5")
+
+    # Only visible symbols (Market Watch)
+    symbols = [s for s in mt5.symbols_get() if s.visible]
+
+    df = pd.DataFrame([{
+        "symbol": s.name
+    } for s in symbols])
+
+    df.to_csv(csv_path, index=False, header=False)
+    print(f"Exported {len(df)} active symbols to {csv_path}")
+
+
+# ---------------------------------------------------------
+# Command-line entry point
+# ---------------------------------------------------------
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Export active MT5 symbols to CSV")
+
+    parser.add_argument("--broker", type=str, help="Broker name (e.g., icmarkets)")
+    parser.add_argument("--out", type=str, help="Output CSV file")
+
+    args = parser.parse_args()
+
+    # Build output filename AFTER parsing
+    if args.out:
+        csv_path = args.out
+    else:
+        if args.broker:
+            csv_path = f"{args.broker}_active_symbols.csv"
+        else:
+            csv_path = "active_symbols.csv"
+
+    export_active_symbols(
+        broker_name=args.broker,
+        csv_path=csv_path   # <-- use the computed value
+    )

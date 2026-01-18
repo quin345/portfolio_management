@@ -47,7 +47,7 @@ def load_symbols(source="mt5", csv_path=None):
     elif source == "csv":
         if csv_path is None:
             raise ValueError("csv_path must be provided when source='csv'")
-        df = pd.read_csv(csv_path)
+        df = pd.read_csv(csv_path, sep="\t")
         return df.iloc[:, 0].tolist()  # assumes first column contains symbols
 
     else:
