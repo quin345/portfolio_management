@@ -89,7 +89,8 @@ def risk_analysis(weights, returns, target_annual_vol=0.05, decay=0.94):
 
     # 2. Ex-post stats BEFORE scaling
     base = ex_post_stats(weights, returns)
-
+ 
+        
     # 3. Scale to target vol
     scaled_weights, scale_factor, scaled_daily_vol, scaled_annual_vol = \
         scale_to_target_vol(weights, cov, target_annual_vol)

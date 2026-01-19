@@ -19,46 +19,28 @@ def infer_fx_pair(symbol):
     # Prefer profit currency
     ccy = profit or margin
 
-    # Check if USDXXX exists (USD as base)
-    usd_base = f"USD{ccy}"
-    if mt5.symbol_info(usd_base) is not None:
-        return usd_base
+    # Get all broker symbols once
+    all_symbols = mt5.symbols_get()
 
-    # Otherwise default to XXXUSD
-    return f"{ccy}USD"
+    # Try to find USD as base: USDXXX + any suffix
+    for s in all_symbols:
+        if s.name.startswith(f"USD{ccy}"):
+            return s.name
+
+    # Try to find XXX as base: XXXUSD + any suffix
+    for s in all_symbols:
+        if s.name.startswith(f"{ccy}USD"):
+            return s.name
+
+    return None
 
 
-# -----------------------------
-# Symbol source selection
-# -----------------------------
-def load_symbols(source="mt5", csv_path=None):
-    """
-    source: "mt5" or "csv"
-    csv_path: path to CSV file if source="csv"
-    """
-    if source == "mt5":
-        symbols = mt5.symbols_get()
-        return [
-            sym.name
-            for sym in symbols
-            if sym.visible and sym.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL
-        ]
-
-    elif source == "csv":
-        if csv_path is None:
-            raise ValueError("csv_path must be provided when source='csv'")
-        df = pd.read_csv(csv_path, sep="\t")
-        return df.iloc[:, 0].tolist()  # assumes first column contains symbols
-
-    else:
-        raise ValueError("source must be 'mt5' or 'csv'")
 
 
 # -----------------------------
 # Build FX map from chosen source
 # -----------------------------
-def build_fx_map(source="mt5", csv_path=None):
-    symbols = load_symbols(source=source, csv_path=csv_path)
+def build_fx_map(symbols):
 
     fx_map = {}
     fx_exempt = set()

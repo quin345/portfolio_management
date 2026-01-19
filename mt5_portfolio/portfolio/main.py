@@ -19,7 +19,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--method",
+        "--cov_method",
         type=str,
         default="ewma",
         help="Volatility method (ewma or garch)"
@@ -47,9 +47,11 @@ if __name__ == "__main__":
         broker_name=broker_name,
         macro_signal_csv=f"{broker_name}_macro_signal.csv",
         vol_target=args.vol_target,
-        method=args.method,
+        cov_method=args.cov_method,
         ewma_lambda=args.ewma_lambda,
         ic=args.ic
     )
 
     print(df[["asset", "contract_size", "min_volume", "current_holdings", "target_lot_size"]])
+
+    

@@ -6,7 +6,7 @@ import MetaTrader5 as mt5
 from brokers import get_broker
 from mapper import build_fx_map
 from dataloader import (
-    load_symbols_from_csv,
+    load_symbols,
     load_log_returns,
     save_metadata,
     load_contract_dataframe
@@ -25,7 +25,7 @@ def run_strategy(
     broker_name: str,
     macro_signal_csv: str,
     vol_target: float,
-    method: str,
+    cov_method: str,
     ewma_lambda: float,
     ic: float,
     lookback_days: int = 60
@@ -37,10 +37,8 @@ def run_strategy(
     ----------
     broker_name : str
         Name of broker (e.g., "icmarkets")
-    active_symbols_csv : str
-        CSV file containing list of tradable symbols
-    factor_signal_csv : str
-        CSV file containing factor signals
+    macro_signal_csv : str
+        CSV file containing intruments and its signals
     vol_target : float
         Annual volatility target (e.g., 0.10)
     ewma_lambda : float
@@ -69,15 +67,12 @@ def run_strategy(
     # --------------------------------------------------------
     # 2. Load symbols
     # --------------------------------------------------------
-    symbols = load_symbols_from_csv(macro_signal_csv)
+    symbols = load_symbols(source="csv", csv_path=macro_signal_csv)
 
     # --------------------------------------------------------
     # 3. FX mapping
     # --------------------------------------------------------
-    fx_map, fx_exempt = build_fx_map(
-        source="csv",
-        csv_path=macro_signal_csv
-    )
+    fx_map, fx_exempt = build_fx_map(symbols)
 
     # --------------------------------------------------------
     # 4. Load returns (with DB caching)
@@ -97,7 +92,7 @@ def run_strategy(
     # --------------------------------------------------------
     # 6. Covariance matrix
     # --------------------------------------------------------
-    cov = get_covariance(returns, method=method, lambda_=ewma_lambda)
+    cov = get_covariance(returns, method=cov_method, lambda_=ewma_lambda)
 
     # --------------------------------------------------------
     # 7. Expected returns

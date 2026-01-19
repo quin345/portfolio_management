@@ -6,12 +6,31 @@ import os
 
 DB_NAME = "returns.db"
 
-# -----------------------------------------
-# Load symbols from CSV
-# -----------------------------------------
-def load_symbols_from_csv(csv_path):
-    df = pd.read_csv(csv_path, sep="\t")
-    return df.iloc[:, 0].dropna().astype(str).tolist()
+# -----------------------------
+# Symbol source selection
+# -----------------------------
+def load_symbols(source="mt5", csv_path=None):
+    """
+    source: "mt5" or "csv"
+    csv_path: path to CSV file if source="csv"
+    """
+    if source == "mt5":
+        symbols = mt5.symbols_get()
+        return [
+            sym.name
+            for sym in symbols
+            if sym.visible and sym.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL
+        ]
+
+    elif source == "csv":
+        if csv_path is None:
+            raise ValueError("csv_path must be provided when source='csv'")
+        df = pd.read_csv(csv_path, sep="\t")
+        return df.iloc[:, 0].tolist()  # assumes first column contains symbols
+
+    else:
+        raise ValueError("source must be 'mt5' or 'csv'")
+
 
 
 # -----------------------------------------
@@ -21,10 +40,9 @@ def fetch_mt5_data(symbol, start_date=None):
     utc_to = pd.Timestamp.now()
 
     if start_date is None:
-        utc_from = utc_to - pd.Timedelta(days=2000)
+        utc_from = utc_to - pd.Timedelta(days=360)
     else:
         utc_from = start_date
-
     rates = mt5.copy_rates_range(symbol, mt5.TIMEFRAME_D1, utc_from, utc_to)
     if rates is None:
         raise ValueError(f"Failed to fetch data for {symbol}")
@@ -82,6 +100,8 @@ def save_to_db(df, broker_name):
 # Compute USD-adjusted returns
 # -----------------------------------------
 def compute_returns(symbols, fx_map, start_date=None):
+    print(symbols)
+    print(fx_map)
     data = {s: fetch_mt5_data(s, start_date) for s in symbols}
 
     fx_symbols = set(fx_map[s] for s in symbols if s in fx_map)
