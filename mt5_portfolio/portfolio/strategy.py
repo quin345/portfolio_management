@@ -69,6 +69,7 @@ def run_strategy(
     # --------------------------------------------------------
     symbols = load_symbols(source="csv", csv_path=macro_signal_csv)
 
+
     # --------------------------------------------------------
     # 3. FX mapping
     # --------------------------------------------------------
@@ -83,6 +84,8 @@ def run_strategy(
         broker_name=broker.name,
         lookback_days=lookback_days
     )
+    
+
 
     # --------------------------------------------------------
     # 5. Save metadata (contract size, min volume)
@@ -117,8 +120,10 @@ def run_strategy(
     # --------------------------------------------------------
     # 9. Volatility targeting
     # --------------------------------------------------------
-    result = risk_analysis(weights, returns)
+    result = risk_analysis(weights, returns, target_annual_vol=vol_target)
     scaled_weights = result["scaled_weights"]
+
+
 
     scaled_df = pd.DataFrame({
         "asset": returns.columns,
@@ -139,7 +144,8 @@ def run_strategy(
     df, gross_target, gross_current = run_lot_sizing(
         df=df,
         fx_exempt=fx_exempt,
-        index_fx_map=fx_map
+        index_fx_map=fx_map,
+        broker_name=broker_name
     )
 
     # --------------------------------------------------------

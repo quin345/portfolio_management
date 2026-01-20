@@ -45,6 +45,21 @@ def load_signals_from_tsv(path: str):
     df["asset"] = df["asset"].astype(str)
     return df.set_index("asset")["signal"].to_dict()
 
+def normalize_signals(signals):
+    values = list(signals.values())
+    min_v = min(values)
+    max_v = max(values)
+
+    # Avoid division by zero
+    if max_v == min_v:
+        return {k: 0 for k in signals}
+
+    normalized = {
+        k: ((v - min_v) / (max_v - min_v)) * 2 - 1
+        for k, v in signals.items()
+    }
+    return normalized
+
 
 # -----------------------------------------
 # Main expected returns function
@@ -53,7 +68,7 @@ def compute_expected_returns(signals,
                              returns: pd.DataFrame,
                              ic=0.05,
                              vol_target=0.10,
-                             vol_window=20,
+                             vol_window=60,
                              from_file=True):
     """
     Convert raw signals into expected returns using:
@@ -91,6 +106,7 @@ def compute_expected_returns(signals,
     # Load signals from TSV file if needed
     if from_file:
         signals = load_signals_from_tsv(signals)
+        signals = normalize_signals(signals)
 
     # Convert to Series and align with returns
     sig = pd.Series(signals, dtype=float)

@@ -27,6 +27,7 @@ def load_symbols(source="mt5", csv_path=None):
             raise ValueError("csv_path must be provided when source='csv'")
         df = pd.read_csv(csv_path, sep="\t")
         return df.iloc[:, 0].tolist()  # assumes first column contains symbols
+        
 
     else:
         raise ValueError("source must be 'mt5' or 'csv'")
@@ -40,7 +41,7 @@ def fetch_mt5_data(symbol, start_date=None):
     utc_to = pd.Timestamp.now()
 
     if start_date is None:
-        utc_from = utc_to - pd.Timedelta(days=360)
+        utc_from = utc_to - pd.Timedelta(days=2000)
     else:
         utc_from = start_date
     rates = mt5.copy_rates_range(symbol, mt5.TIMEFRAME_D1, utc_from, utc_to)
@@ -100,8 +101,7 @@ def save_to_db(df, broker_name):
 # Compute USD-adjusted returns
 # -----------------------------------------
 def compute_returns(symbols, fx_map, start_date=None):
-    print(symbols)
-    print(fx_map)
+
     data = {s: fetch_mt5_data(s, start_date) for s in symbols}
 
     fx_symbols = set(fx_map[s] for s in symbols if s in fx_map)
@@ -113,6 +113,7 @@ def compute_returns(symbols, fx_map, start_date=None):
         if fx.startswith("USD"):
             lr = -lr
         fx_returns[fx] = lr
+
 
     asset_returns = {}
     for symbol in symbols:
@@ -132,41 +133,125 @@ def compute_returns(symbols, fx_map, start_date=None):
     df.index.name = "time"   # <— enforce index name
     return df
 
+#-----------------------------------
+# check database columns
+#----------------------------------
+
+def ensure_columns_exist(table, df):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Read existing DB columns
+    cursor.execute(f"PRAGMA table_info({table})")
+    db_cols = {row[1] for row in cursor.fetchall()}
+
+    # Columns in the DataFrame
+    df_cols = set(df.columns)
+
+    # Find columns missing in DB
+    missing = df_cols - db_cols
+
+    for col in missing:
+        print(f"Adding missing column to DB: {col}")
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} REAL")
+
+    conn.commit()
+    conn.close()
+
+
 
 # -----------------------------------------
 # Main loader with lookback + incremental update
 # -----------------------------------------
 def load_log_returns(symbols, fx_map, broker_name, lookback_days=252):
+    table = f"{broker_name.lower()}_returns"
     existing = load_from_db(broker_name)
 
+    # ---------------------------------------------------------
+    # CASE 1 — No DB exists yet → fetch everything
+    # ---------------------------------------------------------
     if existing is None:
         print("No DB found. Fetching full data from MT5...")
         df = compute_returns(symbols, fx_map)
+
+        # Save full table ONCE
         save_to_db(df, broker_name)
         return df.tail(lookback_days)
 
+    # ---------------------------------------------------------
+    # STEP 1 — Add missing symbols (add new columns)
+    # ---------------------------------------------------------
+    existing_symbols = set(existing.columns)
+    requested_symbols = set(symbols)
+
+    missing = requested_symbols - existing_symbols
+
+    if missing:
+        print(f"Missing symbols in DB: {missing}")
+
+        # Fetch full history for missing symbols
+        missing_data = compute_returns(list(missing), fx_map)
+
+        # Join into DataFrame
+        existing = existing.join(missing_data, how="outer")
+
+        # Build DataFrame containing only new columns
+        to_append = existing[list(missing)].reset_index()
+
+        # Ensure DB schema has these columns
+        ensure_columns_exist(table, to_append)
+
+        # Append only the new columns
+        to_append.to_sql(
+            table,
+            sqlite3.connect(DB_NAME),
+            if_exists="append",
+            index=False
+        )
+
+    # ---------------------------------------------------------
+    # STEP 2 — Check if DB is up to date
+    # ---------------------------------------------------------
     last_date = existing.index.max()
     today = pd.Timestamp.now().normalize()
 
     if last_date >= today - pd.Timedelta(days=1):
         print("DB is up to date. Using cached data.")
-        return existing.tail(lookback_days)
+        return existing[symbols].tail(lookback_days)
 
+    # ---------------------------------------------------------
+    # STEP 3 — Fetch new rows from MT5 and append
+    # ---------------------------------------------------------
     print(f"Updating DB from {last_date.date()} to today...")
     start_date = last_date + pd.Timedelta(days=1)
+
+    print(start_date)
 
     new_data = compute_returns(symbols, fx_map, start_date=start_date)
 
     if new_data.empty:
         print("No new MT5 data available.")
-        return existing.tail(lookback_days)
+        return existing[symbols].tail(lookback_days)
 
+    # Prepare new rows for DB
+    to_append = new_data.reset_index()
+
+    # Ensure DB has all required columns
+    ensure_columns_exist(table, to_append)
+
+    # Append new rows
+    to_append.to_sql(
+        table,
+        sqlite3.connect(DB_NAME),
+        if_exists="append",
+        index=False
+    )
+
+    # Return updated view (without rewriting DB)
     updated = pd.concat([existing, new_data])
     updated = updated[~updated.index.duplicated(keep="last")]
 
-    save_to_db(updated, broker_name)
-    return updated.tail(lookback_days)
-
+    return updated[symbols].tail(lookback_days)
 
 # -----------------------------------------
 # Save metadata
@@ -184,6 +269,8 @@ def save_metadata(symbols, broker_name):
             "symbol": symbol,
             "contract_size": info.trade_contract_size,
             "min_volume": info.volume_min,
+            "max_volume": info.volume_max,
+            "volume_step": info.volume_step,
             "digits": info.digits,
             "description": info.description,
             "updated_at": pd.Timestamp.now()

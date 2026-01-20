@@ -1,9 +1,8 @@
 import math
 import pandas as pd
 import MetaTrader5 as mt5
-import numpy as np
+import sqlite3
 from decimal import Decimal, ROUND_HALF_UP
-
 
 # =========================================================
 # MT5 INITIALIZATION
@@ -12,7 +11,7 @@ mt5.initialize()
 
 
 # =========================================================
-# ACCOUNT EQUITY (AUTO-FETCHED)
+# ACCOUNT EQUITY
 # =========================================================
 def get_equity():
     info = mt5.account_info()
@@ -66,7 +65,18 @@ def safe_quantize(x, places="0.0001"):
 
 
 # =========================================================
-# LOT SIZE CALCULATION
+# LOAD BROKER-SPECIFIC METADATA FROM returns.db
+# =========================================================
+def load_metadata(broker_name):
+    table = f"{broker_name.lower()}_metadata"
+    conn = sqlite3.connect("returns.db")
+    df = pd.read_sql(f"SELECT * FROM {table}", conn)
+    conn.close()
+    return df.set_index("symbol")
+
+
+# =========================================================
+# LOT SIZE CALCULATION (THEORETICAL)
 # =========================================================
 def compute_lot(row, equity, fx_exempt, index_fx_map, index_fx_rates):
     asset = row["asset"]
@@ -92,8 +102,7 @@ def compute_lot(row, equity, fx_exempt, index_fx_map, index_fx_rates):
         if fx_rate is None or fx_rate == 0:
             return None
 
-        # JP225 is quoted inversely
-        if asset == "JP225":
+        if asset in ("JP225", "JPN225"):
             fx_rate = 1 / fx_rate
 
         price = price * fx_rate
@@ -135,7 +144,7 @@ def compute_current_weight(row, equity, fx_exempt, index_fx_map, index_fx_rates)
         if fx_rate is None or fx_rate == 0:
             return None
 
-        if asset == "JP225":
+        if asset in ("JP225", "JPN225"):
             fx_rate = 1 / fx_rate
 
         price = price * fx_rate
@@ -147,10 +156,43 @@ def compute_current_weight(row, equity, fx_exempt, index_fx_map, index_fx_rates)
 
 
 # =========================================================
+# ADJUST LOT SIZE BASED ON METADATA RULES
+# =========================================================
+def adjust_to_min_volume(symbol, lot, metadata):
+    if lot is None or pd.isna(lot):
+        return None
+
+    if symbol not in metadata.index:
+        return lot  # fallback if no metadata
+
+    row = metadata.loc[symbol]
+
+    min_vol = row.get("min_volume", 0.01)
+    step = row.get("volume_step", min_vol)
+    max_vol = row.get("max_volume", 1000)
+
+    # Clamp to allowed range
+    lot = max(min(lot, max_vol), -max_vol)
+
+    # Round to nearest step
+    steps = round(lot / step)
+    adjusted = steps * step
+
+    # Enforce minimum volume (except zero)
+    if adjusted != 0 and abs(adjusted) < min_vol:
+        adjusted = min_vol if adjusted > 0 else -min_vol
+
+    return float(adjusted)
+
+
+# =========================================================
 # MAIN LOT SIZING PIPELINE
 # =========================================================
-def run_lot_sizing(df, fx_exempt, index_fx_map):
+def run_lot_sizing(df, fx_exempt, index_fx_map, broker_name):
     equity = get_equity()
+
+    # Load broker-specific metadata
+    metadata = load_metadata(broker_name)
 
     # Fetch prices
     all_assets = df["asset"].tolist()
@@ -173,7 +215,7 @@ def run_lot_sizing(df, fx_exempt, index_fx_map):
     )
     df["current_weight"] = df["current_weight"].apply(lambda x: safe_quantize(x, "0.0001"))
 
-    # Target lot sizes
+    # Target lot sizes (theoretical)
     df["target_lot_size"] = df.apply(
         lambda row: compute_lot(row, equity, fx_exempt, index_fx_map, index_fx_rates),
         axis=1
@@ -181,8 +223,17 @@ def run_lot_sizing(df, fx_exempt, index_fx_map):
     df["target_lot_size"] = df["target_lot_size"].apply(lambda x: safe_quantize(x, "0.01"))
     df["target_lot_size"] = pd.to_numeric(df["target_lot_size"], errors="coerce")
 
-    # Difference
+    # Raw difference
     df["difference"] = (df["target_lot_size"] - df["current_holdings"]).round(2)
+
+    # Adjusted lot sizes (metadata + MT5-valid)
+    df["adjusted_lot_size"] = df.apply(
+        lambda row: adjust_to_min_volume(row["asset"], row["target_lot_size"], metadata),
+        axis=1
+    )
+
+    # Final trade instruction
+    df["adjusted_difference"] = (df["adjusted_lot_size"] - df["current_holdings"]).round(2)
 
     # Gross totals
     df["abs_target_lot_size"] = df["target_lot_size"].abs()
