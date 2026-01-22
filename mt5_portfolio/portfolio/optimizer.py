@@ -1,20 +1,16 @@
 import numpy as np
 from scipy.optimize import minimize
 
-# -----------------------------
-# Max Sharpe optimization (YOUR version + options)
-# -----------------------------
 def optimize_portfolio(expected_returns,
-                     cov_matrix,
-                     risk_free_rate=0.0,
-                     dollar_neutral=False,
-                     long_only=False,
-                     bounds=None):
+                       cov_matrix,
+                       risk_free_rate=0.0,
+                       dollar_neutral=False,
+                       long_only=False,
+                       bounds=None):
+
     num_assets = len(expected_returns)
 
-    # -----------------------------
     # Objective: negative Sharpe
-    # -----------------------------
     def neg_sharpe(weights):
         port_ret = np.dot(weights, expected_returns)
         port_vol = np.sqrt(weights.T @ cov_matrix @ weights)
@@ -22,43 +18,38 @@ def optimize_portfolio(expected_returns,
             return 1e6
         return -(port_ret - risk_free_rate) / port_vol
 
-    # -----------------------------
     # Bounds
-    # -----------------------------
     if bounds is None:
         if long_only:
             bounds_list = [(0, 1)] * num_assets
         else:
             bounds_list = [(-1, 1)] * num_assets
-    elif isinstance(bounds, tuple):
-        bounds_list = [bounds] * num_assets
-    elif isinstance(bounds, dict):
-        bounds_list = [bounds[a] for a in expected_returns.index]
     else:
-        raise ValueError("Invalid bounds format")
+        bounds_list = [bounds] * num_assets
 
-    # -----------------------------
     # Constraints
-    # -----------------------------
     constraints = []
 
-    # Dollar-neutral or fully invested
+    # Dollar neutrality
     if dollar_neutral:
-        constraints.append({"type": "eq", "fun": lambda w: np.sum(w)})
+            constraints = [
+                {"type": "eq", "fun": lambda w: np.sum(w)},  # dollar neutral
+                {"type": "ineq", "fun": lambda w: 1.0 - np.sum(w**2)}  # leverage
+            ]
     else:
-        constraints.append({"type": "eq", "fun": lambda w: np.sum(w) - 1})
+        constraints = [
+            {"type": "ineq", "fun": lambda w: 1.0 - np.sum(w**2)}  # L2 leverage only
+        ]
 
-    # Your original L2 leverage constraint
-    constraints.append({"type": "ineq", "fun": lambda w: 1.0 - np.sum(w**2)})
+    # Replace L2 constraint with proper gross leverage constraint
+    # Example: sum(|w|) <= 1
+    #constraints.append({"type": "ineq", "fun": lambda w: 1.0 - np.sum(np.abs(w))})
 
-    # -----------------------------
-    # Initial guess (your original)
-    # -----------------------------
-    init_guess = np.ones(num_assets) / num_assets
+    # Neutral initial guess
+    init_guess = np.zeros(num_assets)
+    init_guess[0] = 0.5
+    init_guess[1] = -0.5
 
-    # -----------------------------
-    # Optimization
-    # -----------------------------
     result = minimize(
         neg_sharpe,
         init_guess,
@@ -68,7 +59,7 @@ def optimize_portfolio(expected_returns,
     )
 
     if not result.success:
-        print("Warning: optimization did not fully converge:", result.message)
+        print("Warning:", result.message)
 
     weights = result.x
     daily_ret = np.dot(weights, expected_returns)

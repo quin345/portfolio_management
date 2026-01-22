@@ -114,7 +114,7 @@ def run_strategy(
     weights, daily_ret, daily_vol = optimize_portfolio(
         expected_returns,
         cov,
-        dollar_neutral=True
+        dollar_neutral=False
     )
 
     # --------------------------------------------------------
@@ -122,6 +122,8 @@ def run_strategy(
     # --------------------------------------------------------
     result = risk_analysis(weights, returns, target_annual_vol=vol_target)
     scaled_weights = result["scaled_weights"]
+
+    print(scaled_weights.sum())
 
 
 
