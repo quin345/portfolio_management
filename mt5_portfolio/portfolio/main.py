@@ -59,14 +59,14 @@ print(df[[
     "current_holdings",
     "scaled_weight",
     "target_lot_size",
-    "adjusted_lot_size",       # ← NEW
+    "adjusted_lot_size",    
     "adjusted_difference" 
-         # ← NEW (final trade instruction)
+
 ]])
 print(f"gross current holdings: {gross_current:0.2f}")
 print(f"gross target lots: {gross_target:0.2f}")
 
-df.to_csv("info.csv")
+
 
 from execution import execute_rebalance
 
