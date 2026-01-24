@@ -104,8 +104,8 @@ def factor_macd(df, fast=12, slow=26, signal_period=9):
     macd_signal = pd.Series(macd_signal, index=df.index)
 
     signal = pd.Series(0, index=df.index)
-    signal[(macd > macd_signal) & (macd.shift(1) <= macd_signal.shift(1))] = 1
-    signal[(macd < macd_signal) & (macd.shift(1) >= macd_signal.shift(1))] = -1
+    signal[(macd < macd_signal) & (macd.shift(1) >= macd_signal.shift(1))] = 1
+    signal[(macd > macd_signal) & (macd.shift(1) <= macd_signal.shift(1))] = -1
     return signal
 
 
@@ -163,8 +163,8 @@ def factor_bbands_macd(
 
     # --- MACD confirmation ---
     # Only keep signals aligned with MACD direction
-    signal[(signal == 1) & (macd_hist < 0)] = 0
-    signal[(signal == -1) & (macd_hist > 0)] = 0
+    signal[(signal == -1) & (macd_hist < 0)] = 0
+    signal[(signal == 1) & (macd_hist > 0)] = 0
 
     # --- Optional Volatility Filter ---
     if vol_filter:

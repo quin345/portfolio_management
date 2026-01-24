@@ -36,17 +36,11 @@ def fetch_mt5_data(symbol="NZDUSD.pro", num_candles=99999, timeframe=mt5.TIMEFRA
     return df, max_high, avg_spread
 
 def backtest_symbols(symbols, factor="ma", num_candles=99999, timeframe=mt5.TIMEFRAME_M5):
-    """
-    Returns:
-        - performance_df: summary table
-        - returns_df: factor premia return series for all symbols
-        - ohlcv_dict: {symbol: OHLCV DataFrame}
-    """
 
     plt.figure(figsize=(14,6))
     results = []
     all_returns = {}
-    ohlcv_dict = {}   # <-- store OHLCV DataFrame for each symbol
+    ohlcv_dict = {}
 
     for symbol in symbols:
 
@@ -57,44 +51,77 @@ def backtest_symbols(symbols, factor="ma", num_candles=99999, timeframe=mt5.TIME
             timeframe=timeframe
         )[0]
 
-        # store raw OHLCV before modifying
         ohlcv_dict[symbol] = df.copy()
 
-        # 2. CLEAN & PREPARE
+        # 2. CLEAN
         df = df.rename(columns={"tick_volume": "volume"})
         df["time"] = pd.to_datetime(df["time"], unit="s")
         df = df.set_index("time")
         df["ret"] = df["close"].pct_change()
 
-        # 3. GENERATE SIGNAL
+        # 3. SIGNAL
         signal = generate_signal(df, factor=factor)
 
         # 4. FACTOR PREMIA
         factor_premia = df["ret"] * signal.shift(1)
-
-        # store return series
         all_returns[symbol] = factor_premia
 
         # 5. CUMULATIVE RETURNS
         cum_factor = (1 + factor_premia.fillna(0)).cumprod()
 
-        # 6. PERFORMANCE METRICS
+        # 6. METRICS
         sr = factor_premia.mean() / factor_premia.std()
         annualized_sr = sr * np.sqrt(252)
         annualized_return = factor_premia.mean() * 252
 
-        # 7. COLLECT RESULTS
         results.append({
             "Symbol": symbol,
             "Sharpe": annualized_sr,
             "Annualized Return": annualized_return
         })
 
-        # 8. PLOT
+        # 7. PLOT INDIVIDUAL
         plt.plot(
             cum_factor,
             label=f"{symbol} | SR={annualized_sr:0.2f} | Ret={annualized_return:0.2%}"
         )
+
+    # -----------------------------
+    # 📌 PORTFOLIO CALCULATIONS
+    # -----------------------------
+    returns_df = pd.DataFrame(all_returns).fillna(0)
+
+    # Equal-weight portfolio
+    portfolio_ret = returns_df.mean(axis=1)
+
+    portfolio_cum = (1 + portfolio_ret).cumprod()
+
+    # Portfolio metrics
+    port_sr = portfolio_ret.mean() / portfolio_ret.std()
+    port_annualized_sr = port_sr * np.sqrt(252)
+    port_annualized_return = portfolio_ret.mean() * 252
+
+    # Plot portfolio line
+    plt.plot(
+        portfolio_cum,
+        linewidth=3,
+        color="black",
+        label=f"PORTFOLIO | SR={port_annualized_sr:0.2f} | Ret={port_annualized_return:0.2%}"
+    )
+
+    # -----------------------------
+    # 📌 ADD TEXT BOX WITH PORTFOLIO METRICS
+    # -----------------------------
+    textstr = (
+        f"Portfolio Sharpe: {port_annualized_sr:0.2f}\n"
+        f"Portfolio Annualized Return: {port_annualized_return:0.2%}"
+    )
+
+    plt.gcf().text(
+        0.85, 0.75, textstr,
+        fontsize=11,
+        bbox=dict(facecolor='white', alpha=0.7)
+    )
 
     # FINAL GRAPH SETTINGS
     plt.title(f"Multi-Symbol Factor Backtest – {factor.upper()} Strategy")
@@ -103,8 +130,6 @@ def backtest_symbols(symbols, factor="ma", num_candles=99999, timeframe=mt5.TIME
     plt.tight_layout()
     plt.show()
 
-    # Summary tables
     performance_df = pd.DataFrame(results)
-    returns_df = pd.DataFrame(all_returns)
 
-    return performance_df, returns_df, ohlcv_dict
+    return performance_df, returns_df
