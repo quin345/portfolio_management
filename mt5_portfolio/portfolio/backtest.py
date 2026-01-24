@@ -77,7 +77,8 @@ def backtest_symbols(symbols, factor="ma", num_candles=99999, timeframe=mt5.TIME
         results.append({
             "Symbol": symbol,
             "Sharpe": annualized_sr,
-            "Annualized Return": annualized_return
+            "Annualized Return": annualized_return,
+            "Returns": factor_premia
         })
 
         # 7. PLOT INDIVIDUAL

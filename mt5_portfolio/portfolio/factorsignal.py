@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from talib import abstract
+import numpy as np
 
 
 
@@ -8,8 +9,7 @@ from talib import abstract
 # ---------------------------------------------------------
 # 2. SIGNAL GENERATORS
 # ---------------------------------------------------------
-import pandas as pd
-from talib import abstract
+
 
 # ---------------------------------------------------------
 # Helper: convert df → TA‑Lib OHLCV dict
@@ -174,7 +174,152 @@ def factor_bbands_macd(
 
     return signal
 
+# ---------------------------------------------------------
+# 5. BUY/SELL PRESSURE IMBALANCE (MFI + AD)
+# ---------------------------------------------------------
+def factor_pressure_imbalance(
+    df,
+    mfi_period=14,
+    ad_slope_window=1,
+    mfi_upper=60,
+    mfi_lower=40
+):
+    """
+    Models buying/selling pressure imbalance using:
+        - MFI (Money Flow Index)
+        - AD (Accumulation/Distribution)
+        - AD slope (momentum of accumulation/distribution)
 
+    Output:
+        +1 → buying pressure dominates
+        -1 → selling pressure dominates
+         0 → neutral
+    """
+
+    ohlcv = df_to_ohlcv(df)
+
+    # --- Money Flow Index (0–100) ---
+    mfi = pd.Series(
+        abstract.MFI(ohlcv, timeperiod=mfi_period),
+        index=df.index
+    )
+
+    # --- Accumulation/Distribution Line ---
+    ad = pd.Series(
+        abstract.AD(ohlcv),
+        index=df.index
+    )
+
+    # --- AD slope (change in accumulation/distribution) ---
+    ad_slope = ad.diff(ad_slope_window)
+
+    # --- Initialize signal ---
+    signal = pd.Series(0, index=df.index)
+
+    # --- Buying pressure ---
+    signal[(mfi > mfi_upper) & (ad_slope > 0)] = -1
+
+    # --- Selling pressure ---
+    signal[(mfi < mfi_lower) & (ad_slope < 0)] = 1
+
+    return signal
+
+# ---------------------------------------------------------
+# 6. RSI PRESSURE REVERSAL
+# ---------------------------------------------------------
+def factor_rsi_pressure(df, period=14, upper=70, lower=30):
+    """
+    Models pressure imbalance using RSI extremes.
+    +1 → oversold reversal (buying pressure expected)
+    -1 → overbought reversal (selling pressure expected)
+     0 → neutral
+    """
+    ohlcv = df_to_ohlcv(df)
+
+    rsi = pd.Series(
+        abstract.RSI(ohlcv, timeperiod=period),
+        index=df.index
+    )
+
+    signal = pd.Series(0, index=df.index)
+    signal[rsi < lower] = 1
+    signal[rsi > upper] = -1
+
+    return signal
+
+# ---------------------------------------------------------
+# 7. STOCHASTIC MOMENTUM IMBALANCE
+# ---------------------------------------------------------
+def factor_stoch_pressure(df, k_period=14, d_period=3, upper=80, lower=20):
+    """
+    Uses Stochastic Oscillator to detect momentum imbalance.
+    +1 → bullish momentum
+    -1 → bearish momentum
+     0 → neutral
+    """
+    ohlcv = df_to_ohlcv(df)
+
+    slowk, slowd = abstract.STOCH(
+        ohlcv,
+        fastk_period=k_period,
+        slowk_period=d_period,
+        slowd_period=d_period
+    )
+
+    slowk = pd.Series(slowk, index=df.index)
+    slowd = pd.Series(slowd, index=df.index)
+
+    signal = pd.Series(0, index=df.index)
+    signal[(slowk > slowd) & (slowk < lower)] = 1
+    signal[(slowk < slowd) & (slowk > upper)] = -1
+
+    return signal
+
+# ---------------------------------------------------------
+# 8. OBV PRESSURE TREND
+# ---------------------------------------------------------
+def factor_obv_pressure(df, slope_window=5):
+    """
+    OBV slope models volume-driven pressure.
+    +1 → OBV rising (buying pressure)
+    -1 → OBV falling (selling pressure)
+     0 → flat
+    """
+    ohlcv = df_to_ohlcv(df)
+
+    obv = pd.Series(
+        abstract.OBV(ohlcv),
+        index=df.index
+    )
+
+    slope = obv.diff(slope_window)
+
+    signal = pd.Series(0, index=df.index)
+    signal[slope > 0] = -1
+    signal[slope < 0] = 1
+
+    return signal
+
+# ---------------------------------------------------------
+# 9. CANDLE BODY PRESSURE (BODY vs WICK)
+# ---------------------------------------------------------
+def factor_candle_pressure(df, body_ratio=0.55):
+    """
+    Measures candle body dominance.
+    +1 → strong bullish candle (buyers dominate)
+    -1 → strong bearish candle (sellers dominate)
+     0 → weak / indecisive candle
+    """
+    body = (df["close"] - df["open"]).abs()
+    range_ = df["high"] - df["low"]
+
+    strength = body / range_.replace(0, np.nan)
+
+    signal = pd.Series(0, index=df.index)
+    signal[(df["close"] > df["open"]) & (strength > body_ratio)] = -1
+    signal[(df["close"] < df["open"]) & (strength > body_ratio)] = 1
+
+    return signal
 # ---------------------------------------------------------
 # MAIN INTERFACE
 # ---------------------------------------------------------
@@ -199,8 +344,25 @@ def generate_signal(df, factor="ma", **kwargs):
     elif factor == "bbands_macd":
         
         return factor_bbands_macd(df, **kwargs) 
+    
+    elif factor == "pressure":
+        return factor_pressure_imbalance(df, **kwargs)
+    
+    elif factor == "rsi_pressure":
+        return factor_rsi_pressure(df, **kwargs)
 
+    elif factor == "stoch_pressure":
+        return factor_stoch_pressure(df, **kwargs)
+
+    elif factor == "obv_pressure":
+        return factor_obv_pressure(df, **kwargs)
+
+    elif factor == "candle_pressure":
+        return factor_candle_pressure(df, **kwargs)
     else:
-        print(repr(factor))
+
         raise ValueError(f"Unknown factor: {factor}")
+    
+
+
     
