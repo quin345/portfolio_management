@@ -322,21 +322,6 @@ def factor_candle_pressure(df, body_ratio=0.55):
     return signal
 
 
-import numpy as np
-import pandas as pd
-from talib import abstract
-
-# ---------------------------------------------------------
-# Helper: convert df → TA‑Lib OHLCV dict
-# ---------------------------------------------------------
-def df_to_ohlcv(df):
-    return {
-        "open": df["open"].astype(float),
-        "high": df["high"].astype(float),
-        "low": df["low"].astype(float),
-        "close": df["close"].astype(float),
-        "volume": df["volume"].astype(float),
-    }
 
 # ---------------------------------------------------------
 # KELTNER CHANNEL TREND-PULLBACK
@@ -602,42 +587,27 @@ def factor_pvt_momentum(df, slope_window=10):
 # MAIN INTERFACE
 # ---------------------------------------------------------
 def generate_signal(df, factor="ma", **kwargs):
-    """
-    factor options:
-        "ma"     → Moving Average Crossover
-        "bbands" → Bollinger Bands Mean Reversion
-        "macd"   → MACD Crossover
-    kwargs are passed to the factor function
-    """
+
     factor = factor.strip().lower() 
+
     if factor == "ma":
         return factor_ma_cross(df, **kwargs)
-
     elif factor == "bbands":
         return factor_bbands(df, **kwargs)
-
     elif factor == "macd":
         return factor_macd(df, **kwargs)
-    
     elif factor == "bbands_macd":
-        
-        return factor_bbands_macd(df, **kwargs) 
-    
+        return factor_bbands_macd(df, **kwargs)    
     elif factor == "pressure":
-        return factor_pressure_imbalance(df, **kwargs)
-    
+        return factor_pressure_imbalance(df, **kwargs)    
     elif factor == "rsi_pressure":
         return factor_rsi_pressure(df, **kwargs)
-
     elif factor == "stoch_pressure":
         return factor_stoch_pressure(df, **kwargs)
-
     elif factor == "obv_pressure":
         return factor_obv_pressure(df, **kwargs)
-
     elif factor == "candle_pressure":
-        return factor_candle_pressure(df, **kwargs)
-    
+        return factor_candle_pressure(df, **kwargs)    
     elif factor == "keltner":
         return factor_keltner(df, **kwargs)
     elif factor == "adx_trend":
@@ -668,9 +638,7 @@ def generate_signal(df, factor="ma", **kwargs):
         return factor_rsi_macd_hybrid(df, **kwargs)
     elif factor == "pvt_momentum":
         return factor_pvt_momentum(df, **kwargs)
-
     else:
-
         raise ValueError(f"Unknown factor: {factor}")
     
 
