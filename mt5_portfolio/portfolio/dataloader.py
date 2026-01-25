@@ -37,14 +37,14 @@ def load_symbols(source="mt5", csv_path=None):
 # -----------------------------------------
 # Fetch MT5 price data
 # -----------------------------------------
-def fetch_mt5_data(symbol, start_date=None):
+def fetch_mt5_data(symbol, start_date=None, timeframe=mt5.TIMEFRAME_D1):
     utc_to = pd.Timestamp.now()
 
     if start_date is None:
         utc_from = utc_to - pd.Timedelta(days=2000)
     else:
         utc_from = start_date
-    rates = mt5.copy_rates_range(symbol, mt5.TIMEFRAME_D1, utc_from, utc_to)
+    rates = mt5.copy_rates_range(symbol, timeframe=timeframe, utc_from, utc_to)
     if rates is None:
         raise ValueError(f"Failed to fetch data for {symbol}")
 
