@@ -226,4 +226,4 @@ def evaluate_symbol(df, stddev=2.5):
     # REPORT
     report = classification_report(y_val_trading, y_pred, output_dict=False)
 
-    return report, label_stats, model
+    return report, label_stats, threshold
