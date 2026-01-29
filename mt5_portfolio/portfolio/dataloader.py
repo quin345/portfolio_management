@@ -44,13 +44,17 @@ def fetch_mt5_data(symbol, start_date=None, timeframe=mt5.TIMEFRAME_D1):
         utc_from = utc_to - pd.Timedelta(days=2000)
     else:
         utc_from = start_date
-    rates = mt5.copy_rates_range(symbol, timeframe=timeframe, utc_from, utc_to)
+
+    # FIX: MT5 does NOT accept keyword arguments in your version
+    rates = mt5.copy_rates_range(symbol, timeframe, utc_from, utc_to)
+
     if rates is None:
         raise ValueError(f"Failed to fetch data for {symbol}")
 
     df = pd.DataFrame(rates)
     df["time"] = pd.to_datetime(df["time"], unit="s")
-    df.set_index("time", inplace=True)   # <— time is index here
+    df.set_index("time", inplace=True)
+
     return df
 
 

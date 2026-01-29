@@ -1,5 +1,5 @@
 # strategy.py
-
+import numpy as np
 import pandas as pd
 import MetaTrader5 as mt5
 
@@ -108,13 +108,30 @@ def run_strategy(
         vol_window=lookback_days
     )
 
+        # --------------------------------------------------------
+    # 7B. Signal-based, volatility-scaled weights (ADDED)
+    # --------------------------------------------------------
+    vol = pd.Series(np.sqrt(np.diag(cov)), index=expected_returns.index)
+    
+
+    print(returns.tail())
+    # Risk-adjust the signal
+    signal_vol_weights = expected_returns / vol
+
+    # Normalize to gross = 1 (long/short)
+    signal_vol_weights = signal_vol_weights / signal_vol_weights.abs().sum()
+
+    print("\nSignal-vol scaled weights:")
+    print(signal_vol_weights)
+
     # --------------------------------------------------------
     # 8. Optimize portfolio (Max Sharpe)
     # --------------------------------------------------------
     weights, daily_ret, daily_vol = optimize_portfolio(
         expected_returns,
         cov,
-        dollar_neutral=False
+        risk_free_rate=0.0,
+        max_weight=0.10
     )
 
     # --------------------------------------------------------
