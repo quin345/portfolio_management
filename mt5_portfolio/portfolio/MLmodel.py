@@ -134,7 +134,7 @@ def generate_labels(df, threshold=0.001, compress=False):
 
 
 
-def evaluate_symbol(df, stddev=2.5):
+def evaluate_symbol(df, stddev=3):
 
     threshold = df['close'].pct_change().std() * stddev
     print(f"threshold: {threshold:0.2%}")

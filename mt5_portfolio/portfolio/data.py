@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 
 class MT5DatabaseSaver:
-    def __init__(self, broker_name, db_path="market_data.db"):
+    def __init__(self, broker_name, db_path="market_price.db"):
         self.broker_name = broker_name.lower()
         self.db_path = db_path
 
@@ -24,6 +24,7 @@ class MT5DatabaseSaver:
         return f"{self.broker_name}_{base_name}"
 
     def _create_tables(self):
+        # OHLCV table
         self.cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self._table("market_data")} (
                 symbol TEXT NOT NULL,
@@ -38,20 +39,22 @@ class MT5DatabaseSaver:
             )
         """)
 
+        # Symbol metadata table (FINAL SCHEMA)
         self.cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {self._table("symbol_metadata")} (
                 symbol TEXT PRIMARY KEY,
                 minimal_volume REAL,
                 volume_step REAL,
                 margin_currency TEXT,
-                profit_currency TEXT
+                profit_currency TEXT,
+                contract_size REAL
             )
         """)
+
         self.conn.commit()
 
     def save_data(self, symbol, timeframe, rates):
         for rate in rates:
-            
             time = datetime.utcfromtimestamp(int(rate['time'])).strftime("%Y-%m-%d %H:%M:%S")
 
             self.cursor.execute(f"""
@@ -68,6 +71,7 @@ class MT5DatabaseSaver:
                 float(rate['close']),
                 int(rate['tick_volume'])
             ))
+
         self.conn.commit()
 
     def update_db(self, symbol="EURUSD", timeframe=mt5.TIMEFRAME_M1, num_bars=10):
@@ -95,48 +99,41 @@ class MT5DatabaseSaver:
             mt5.shutdown()
             raise ValueError(f"Symbol {symbol} not found")
 
+        # Insert metadata including contract size
         self.cursor.execute(f"""
             INSERT OR REPLACE INTO {self._table("symbol_metadata")}
-            (symbol, minimal_volume, volume_step, margin_currency, profit_currency)
-            VALUES (?, ?, ?, ?, ?)
+            (symbol, minimal_volume, volume_step, margin_currency, profit_currency, contract_size)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             info.name,
             float(info.volume_min),
             float(info.volume_step),
             getattr(info, "currency_margin", None),
-            getattr(info, "currency_profit", None)
+            getattr(info, "currency_profit", None),
+            float(info.trade_contract_size)
         ))
-        self.conn.commit()
 
+        self.conn.commit()
         mt5.shutdown()
 
     def load_ohlcv(self, symbol="EURUSD", timeframe="1", limit=500):
-        """Load OHLCV data for this broker instance, guaranteed ascending."""
         table_name = self._table("market_data")
-
-        # First get the latest N rows (descending), then reorder ascending
         query = f"""
-            SELECT *
-            FROM (
-                SELECT timestamp, open, high, low, close, tick_volume
-                FROM {table_name}
-                WHERE symbol = ? AND timeframe = ?
-                ORDER BY timestamp DESC
-                LIMIT ?
-            )
+            SELECT timestamp, open, high, low, close, tick_volume
+            FROM {table_name}
+            WHERE symbol = ? AND timeframe = ?
             ORDER BY timestamp ASC
+            LIMIT ?
         """
 
         df = pd.read_sql_query(query, self.conn, params=(symbol, timeframe, limit))
-
         df.rename(columns={"tick_volume": "volume"}, inplace=True)
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
         df.set_index("timestamp", inplace=True)
 
         return df
-        
+
     def load_symbol_info(self, symbol="EURUSD"):
-        """Load symbol metadata for this broker instance."""
         table_name = self._table("symbol_metadata")
         query = f"""
             SELECT *
