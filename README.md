@@ -1,195 +1,95 @@
-# 🧠 Active Portfolio Management Tool
+# 🧠 Portfolio Management System
 
-A modular **portfolio management system** for **active investors and hedge fund managers**.
-It integrates with multiple **brokerage and trading platforms** — including **Interactive Brokers (IBKR)**, **MetaTrader 5 (MT5)**, and **cTrader** — to provide unified access to account data, positions, and performance analytics.
+A **broker-agnostic, active portfolio management system**. Market data flows in from **multiple data vendors** (normalized into one internal schema); brokers are strictly optional pluggable adapters. The system consolidates positions across accounts and provides **analytics, risk monitoring, optimization, and rebalancing** for a self-directed, active, discretionary portfolio manager.
 
-This project serves as the foundation for **quantitative active portfolio management**, enabling seamless **data ingestion**, **risk monitoring**, and **multi-platform trade analysis**.
+> **📚 Documentation map**
+> - **[`FOUNDATIONAL_COMPONENTS.md`](FOUNDATIONAL_COMPONENTS.md)** — the authoritative domain model (Investopedia-anchored, with traceability IDs FC-xx). Every feature must trace here; anything else is out of scope.
+> - **[`PLAN.md`](PLAN.md)** — project phases (0–7), each gated against the foundational components.
+> - **[`TECHNICAL.md`](TECHNICAL.md)** — codebase wiring: architecture, adapter contracts, module layout.
+> - **[`thoughtProcess.md`](thoughtProcess.md)** — planning prompts and decision evolution.
 
 ---
 
-## 🚀 Features
+## 🎯 What It Does
 
-* **Multi-broker integration**
+The system implements the classic portfolio-management loop: **assess → allocate → diversify → rebalance → monitor**.
 
-  * Fetch open positions, account equity, and trade history from:
+- **Multi-vendor market data** — pluggable `MarketDataProvider` adapters (Dukascopy, vendor APIs, flat files); one canonical price/FX schema with quality gates. No vendor is privileged.
+- **Consolidated portfolio view** — aggregate positions across accounts into one portfolio; PnL, exposure, and benchmark-relative performance.
+- **Risk & analytics** — volatility, VaR, drawdown, covariance, risk-adjusted return vs. objectives.
+- **Allocation & rebalancing** — target mixes per risk profile (aggressive / moderate / conservative / income-oriented), threshold- or calendar-based rebalancing triggers.
+- **Pluggable execution** — the engine emits *intents*, never broker orders. Broker adapters implement a uniform `ExecutionVenue` interface and can remain entirely unimplemented: the system runs fully in analysis/monitoring mode.
 
-    * 🧩 Interactive Brokers (IBKR)
-    * ⚙️ MetaTrader 5 (MT5)
-    * 📊 cTrader (via API bridge)
-
-* **Unified portfolio view**
-
-  * Aggregate and normalize exposure across all brokers and asset classes
-  * Consolidate PnL, margin, and risk metrics in one dashboard
-
-* **Active portfolio management**
-
-  * Dynamic risk and return analytics
-  * Stop-loss and rebalancing logic at both **asset** and **portfolio** levels
-
-* **Vectorized backtesting (planned)**
-
-  * Test allocation and stop-loss logic on historical data in a high-speed, vectorized pipeline
-
-* **Flexible data pipeline**
-
-  * Modular API wrappers for brokers
-  * Unified data schema for positions and orders
-
-* **Extensible architecture**
-
-  * Ready for future alpha models, Black-Litterman optimization, or machine learning layers
+**Out of scope by design**: passive index-tracking (used only for benchmark definition), broker SDKs in core code, retail compliance machinery.
 
 ---
 
 ## 🧩 Architecture Overview
 
 ```
-+--------------------------+
-|   Broker APIs / Feeds    |
-|  (IBKR, MT5, cTrader)    |
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|   Data Normalization     |
-|   - Position schema      |
-|   - Currency conversion  |
-|   - Broker-specific fixes|
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|   Portfolio Engine       |
-|   - Aggregation          |
-|   - PnL attribution      |
-|   - Risk metrics         |
-+------------+-------------+
-             |
-             v
-+--------------------------+
-|   Strategy / Execution   |
-|   - Active allocation    |
-|   - Stop loss control    |
-|   - Optimization layer   |
-+--------------------------+
+┌─────────────────────────────────────────────────────────────┐
+│                    DATA VENDOR ADAPTERS                     │
+│   VendorA │ VendorB │ Dukascopy │ flat files │ ... (FC-C1)  │
+└──────────────┬──────────────────────────────────────────────┘
+               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 DATA NORMALIZATION LAYER                    │
+│   unified schema · FX conversion · quality gates (FC-C2)    │
+└──────────────┬──────────────────────────────────────────────┘
+               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     PORTFOLIO ENGINE                        │
+│  domain model · aggregation · PnL · benchmarks (FC-C3..C6)  │
+└──────┬───────────────────────┬──────────────────────────────┘
+       ▼                       ▼
+┌──────────────────┐   ┌──────────────────────────────────────┐
+│  RISK & ANALYTICS│   │  ALLOCATION / OPTIMIZATION /         │
+│  vol · VaR · dd  │   │  REBALANCING (FC-C1, C2, P2, P3)     │
+└──────────────────┘   └──────────────┬───────────────────────┘
+                                      ▼
+                      ┌───────────────────────────────────┐
+                      │  EXECUTION INTENT MODEL (FC-D7)   │
+                      │  broker adapters — pluggable      │
+                      └───────────────────────────────────┘
 ```
+
+Full details, contracts, and repository layout in **[`TECHNICAL.md`](TECHNICAL.md)**.
+
 
 ---
 
-## ⚙️ Installation
+## 🗺️ Roadmap
 
-```bash
-git clone https://github.com/yourusername/active-portfolio-manager.git
-cd active-portfolio-manager
-pip install -r requirements.txt
-```
+| Phase | Name | Status |
+|---|---|---|
+| 0 | Documentation Foundation | ✅ Done |
+| 1 | Core Domain Model | 🔜 Next |
+| 2 | Multi-Vendor Data Layer | ⏳ |
+| 3 | Portfolio Engine & Analytics | ⏳ |
+| 4 | Allocation & Rebalancing | ⏳ |
+| 5 | Active Alpha Layer (optional) | ⏳ |
+| 6 | Execution & Monitoring | ⏳ |
+| 7 | Final Documentation | ⏳ |
 
-**Requirements**
-
-* Python 3.10+
-* Access to at least one broker API (IBKR, MT5, or cTrader)
-* Dependencies: `pandas`, `numpy`, `requests`, `plotly`, `sqlalchemy`
-
----
-
-## 🔑 Broker Setup
-
-### 1. Interactive Brokers (IBKR)
-
-* Configure **IBKR TWS API** or **IB Gateway**
-* Add credentials to `.env`:
-
-  ```env
-  IBKR_HOST=127.0.0.1
-  IBKR_PORT=7497
-  IBKR_CLIENT_ID=1
-  ```
-
-### 2. MetaTrader 5 (MT5)
-
-* Install the MetaTrader5 Python package
-* Log in to your trading account:
-
-  ```python
-  import MetaTrader5 as mt5
-  mt5.initialize(login=1234567, password="xxxx", server="Broker-Server")
-  ```
-
-### 3. cTrader
-
-* Use the **Open API** bridge for cTrader
-* Add credentials to `.env`:
-
-  ```env
-  CTRADER_CLIENT_ID=your_client_id
-  CTRADER_CLIENT_SECRET=your_client_secret
-  CTRADER_ACCESS_TOKEN=your_access_token
-  ```
+Details and gate criteria per phase in **[`PLAN.md`](PLAN.md)**.
 
 ---
 
-## 📈 Example Usage
-
-```python
-from portfolio.core import PortfolioEngine
-from connectors import IBKRConnector, MT5Connector, CTraderConnector
-
-ibkr = IBKRConnector()
-mt5 = MT5Connector()
-ctrader = CTraderConnector()
-
-# Fetch all positions
-positions = ibkr.get_positions() + mt5.get_positions() + ctrader.get_positions()
-
-# Aggregate portfolio
-engine = PortfolioEngine(positions)
-summary = engine.aggregate()
-
-print(summary)
-engine.plot_exposure()
-```
-
----
-
-## 🧮 Roadmap
-
-| Milestone                                             | Status         |
-| ----------------------------------------------------- | -------------- |
-| Broker connectors (IBKR, MT5, cTrader)                | ✅ Done         |
-| Portfolio aggregation                                 | ✅ Done         |
-| PnL and exposure normalization                        | ✅ Done         |
-| Risk dashboard (VaR, beta, volatility)                | 🔄 In Progress |
-| Vectorized backtesting engine                         | 🔜 Planned     |
-| Optimization module (Black-Litterman / Treynor-Black) | 🔜 Planned     |
-
----
-
-## 🧱 Folder Structure
+## 🧱 Repository Structure
 
 ```
-active-portfolio-manager/
-│
-├── connectors/
-│   ├── ibkr_connector.py
-│   ├── mt5_connector.py
-│   ├── ctrader_connector.py
-│
-├── portfolio/
-│   ├── core.py
-│   ├── risk.py
-│   ├── optimization.py
-│
-├── utils/
-│   ├── config_loader.py
-│   ├── currency_tools.py
-│
-├── notebooks/
-│   ├── demo_analysis.ipynb
-│
-├── requirements.txt
-└── README.md
+portfolio_management/
+├── FOUNDATIONAL_COMPONENTS.md   # authoritative domain model (anchor)
+├── PLAN.md                      # project phases
+├── TECHNICAL.md                 # architecture & wiring
+├── thoughtProcess.md            # planning prompts & decision log
+├── README.md                    # this file
+└── database/                    # vendor-agnostic market-data pipeline (Phase 2 seed)
+    ├── analytics/               # model research notebooks
+    └── data/raw/                # fetchers (Dukascopy etc.), store, scanner
 ```
+
+The production package (`domain/`, `data/`, `engine/`, `risk/`, `allocation/`, `execution/`) is introduced from Phase 1 onward — see the target layout in **[`TECHNICAL.md`](TECHNICAL.md)**.
 
 ---
 
@@ -197,25 +97,18 @@ active-portfolio-manager/
 
 This project is for **educational and research purposes only**.
 It **does not constitute financial advice**, and is not a solicitation to invest or trade.
-Use at your own risk and comply with your broker’s API terms and local regulations.
+Use at your own risk and comply with any data vendor's terms and local regulations.
 
 ---
 
 ## 🧬 License
 
-MIT License © 2025 [Your Name or Fund Name]
+MIT License © 2025
 
 ---
 
 ## 🤝 Contributing
 
 Pull requests are welcome!
-For major changes, please open an issue first to discuss your ideas.
-
----
-
-## 🌐 Contact
-
-For collaboration or fund integration inquiries:
-📧 **[contact@yourfundname.com](mailto:contact@yourfundname.com)**
+For major changes, please open an issue first — and note that all changes must trace to a component in **[`FOUNDATIONAL_COMPONENTS.md`](FOUNDATIONAL_COMPONENTS.md)**.
 
