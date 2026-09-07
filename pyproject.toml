@@ -1,0 +1,12 @@
+[project]
+name = "pmcore"
+version = "0.1.0"
+description = "Broker-agnostic portfolio management core domain"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

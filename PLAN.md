@@ -73,8 +73,8 @@
 | Phase | Name | Status | Gate |
 |---|---|---|---|
 | 0 | Documentation Foundation | ✅ Done | Docs exist; broker code removed |
-| 1 | Core Domain Model | 🔜 Next | Entities + tests trace to FC-C3/C4/C6 |
-| 2 | Multi-Vendor Data Layer | ⏳ | Unified schema + 2 vendors live |
+| 1 | Core Domain Model | ✅ Done | `pmcore/domain/` + 30 passing tests trace to FC-C3/C4/C5/C6, FC-M1 |
+| 2 | Multi-Vendor Data Layer | 🔜 Next | Unified schema + 2 vendors live |
 | 3 | Portfolio Engine & Analytics | ⏳ | Consolidated view + risk metrics |
 | 4 | Allocation & Rebalancing | ⏳ | Rebalance loop works on historical data |
 | 5 | Active Alpha Layer | ⏳ optional | Traces to FC-A1 |

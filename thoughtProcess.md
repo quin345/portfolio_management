@@ -36,9 +36,30 @@ The repo began as a multi-broker portfolio tool: `CTraderOpenApiDemo` (C#), `ibk
 
 ---
 
-## Open Questions / Future Entries
+## Entry 6 — Phase 1: Core Domain Model (pmcore)
+
+> *User prompt*: "Let's proceed to phase 1."
+
+**Decisions**:
+- Package named **`pmcore`** (short, unambiguous core-library name); `domain/` implemented first, pure Python with zero dependencies — no pandas, no I/O, no broker/vendor imports (TECHNICAL.md §5/§6).
+- **Money as Decimal value object** with same-currency-only arithmetic; FX conversion is always explicit through an `FxConverter` port (data layer implements it in Phase 2). Identity (base==quote, rate=1) allowed for convenience.
+- **Position is long-only** for now (shorts raise); revisit later via FC traceability if ever needed.
+- **Transactions carry fees** (FC-F1: cost awareness is a foundational component, so fees are first-class, not an afterthought).
+- **Benchmark is a first-class domain object** (FC-M1): `Portfolio.drift_vs_benchmark` makes benchmark-relative evaluation a domain primitive, preparing Phase 3/4.
+- **InvestorProfile/Objective/Constraints** encode the FC-P1 *assess* step as state that allocation (Phase 4) will consume.
+- Multi-currency accounts settle only in their base currency for now; cross-currency settlement is deferred to the Phase 3 engine with explicit FX — noted in `Account.apply`.
+
+**Validation**: 30 unit tests pass — money arithmetic/currency handling, weighted-average cost, mark-to-market, aggregation across accounts/currencies, weight-sum invariant (§3.3), benchmark drift, objective progress.
 
 - Language & package layout final choice (Phase 1).
 - Which two data vendors come first (Phase 2) — Dukascopy fetcher in `database/` is the reference candidate.
 - Whether the active alpha layer (PLAN Phase 5) is pursued — must justify itself against FC-A1 (active management) before adoption.
 - Execution: rebuild broker adapters later only if a live trading need emerges (FC-D7).
+
+## Open Questions / Future Entries
+
+- Language & package layout final choice (Phase 1). -> resolved: Python, `pmcore`
+- Which two data vendors come first (Phase 2) - Dukascopy fetcher in `database/` is the reference candidate.
+- Whether the active alpha layer (PLAN Phase 5) is pursued - must justify itself against FC-A1 before adoption.
+- Execution: rebuild broker adapters later only if a live trading need emerges (FC-D7).
+- Shorts, cross-currency settlement: deferred, revisit via FC traceability.

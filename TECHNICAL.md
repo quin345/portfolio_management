@@ -49,13 +49,13 @@ portfolio_management/
 ├── database/                    # existing vendor-agnostic data pipeline (Phase 2 seed)
 │   ├── analytics/               # model research notebooks
 │   └── data/raw/                # fetchers, store, scanner (Dukascopy etc.)
-└── <new_package>/               # Phase 1 onward (name decided in Phase 1)
-    ├── domain/                  # Portfolio, Position, Objective, RiskProfile (FC-C3, C4, C6)
-    ├── data/                    # vendor adapters + normalization (FC-C1, C2)
-    ├── engine/                  # aggregation, PnL, benchmarks (FC-C5, C6)
-    ├── risk/                    # risk metrics (FC-C4, M1)
-    ├── allocation/              # optimization, diversification, rebalancing (FC-C1, C2, P2, P3)
-    └── execution/               # intent model + broker adapter interface (FC-D7)
+└── pmcore/                       # production package (named in Phase 1)
+    ├── domain/                   # Portfolio, Position, Account, Objective, RiskProfile (FC-C3, C4, C5, C6)
+    ├── data/                     # vendor adapters + normalization (FC-C1, C2) — Phase 2
+    ├── engine/                   # aggregation, PnL, benchmarks (FC-C5, C6) — Phase 3
+    ├── risk/                     # risk metrics (FC-C4, M1) — Phase 3
+    ├── allocation/               # optimization, diversification, rebalancing (FC-C1, C2, P2, P3) — Phase 4
+    └── execution/                # intent model + broker adapter interface (FC-D7) — Phase 6
 ```
 
 
