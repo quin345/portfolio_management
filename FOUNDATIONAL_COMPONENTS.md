@@ -2,9 +2,9 @@
 
 > **AUTHORITY**: This document is the single source of truth for the portfolio management system. Every feature, module, and phase in `PLAN.md` and `TECHNICAL.md` MUST trace to a component defined here. If a proposed change cannot be traced to this document, it is out of scope.
 >
-> **Context**: This project is a broker-agnostic, multi-vendor-data portfolio management system for *active discretionary* portfolio management (see [Project Traceability](#project-traceability) at the bottom). It consolidates positions across accounts, ingests market data from several data vendors, and provides analytics, risk monitoring, optimization, and rebalancing.
+> **Context**: This project is a broker-agnostic, multi-vendor-data portfolio management system for *active discretionary* portfolio management. It consolidates positions across accounts, ingests market data from several data vendors, and provides analytics, risk monitoring, optimization, and rebalancing.
 >
-> **Source**: Framework and definitions based on Investopedia — [Portfolio Management: Definition, Types, and Strategies](https://www.investopedia.com/terms/p/portfoliomanagement.asp) (content pasted verbatim below; project alignment notes added around it).
+> **Source**: Framework and definitions based on Investopedia — [Portfolio Management: Definition, Types, and Strategies](https://www.investopedia.com/terms/p/portfoliomanagement.asp)
 
 The framework is decomposed into traceable component IDs. Every module in `TECHNICAL.md` and phase in `PLAN.md` cites these.
 
