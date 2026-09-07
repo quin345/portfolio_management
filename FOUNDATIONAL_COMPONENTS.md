@@ -10,7 +10,7 @@ The framework is decomposed into traceable component IDs. Every module in `TECHN
 
 ## Core Components (FC-C)
 
-| ID | Component (from source content above) |
+| ID | Component |
 |---|---|
 | FC-C1 | **Asset allocation** — the right mix of asset classes optimized for accepted risk |
 | FC-C2 | **Diversification** — spreading holdings within/across asset classes to reduce single-investment risk |
